@@ -1,22 +1,14 @@
-import xarray as xr
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-import scipy
 import datetime
 import math 
-import statistics
-import netCDF4
-from scipy import stats
 from collections import Counter
 from numpy import array
 import pygrib
 import cfgrib
 import argparse
-from glob import glob
-import sys
-import os
 
 #-----CARTOPY---------------------
 import cartopy
@@ -24,9 +16,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import cartopy.io.shapereader as shpreader
 
-
 grib= pygrib.open('../gfsanl_4_20160712_0000_000.grb2')
-
 
 for g in grib:
   #print(g.validDate) 
@@ -37,7 +27,6 @@ print(time)
 u = grib.select(name='U component of wind', typeOfLevel = 'isobaricInhPa', level = 925)[0]
 
 v= grib.select(name='V component of wind', typeOfLevel = 'isobaricInhPa', level = 925)[0]
-
 
 
 # Extract the Brightness mslvalues from the NetCDF 
@@ -72,9 +61,6 @@ gl.right_labels = False
 
 #---------- Selecionando as lats e lons para cada var---------
 
-  
-
-
 # Correct the longitudes from 0 - 360 
 lons_corr = lons - 360
 
@@ -89,10 +75,9 @@ w=4
 
 S2=ax.streamplot(lons, lats, ua, va,density=3)
 
-
 #S2 = plt.quiver(lons[::w,::w],lats[::w,::w], ua[::w,::w], va[::w,::w],color='black')
 
-plt.savefig('test.png')
+plt.savefig('plot.png')
 
 
 
