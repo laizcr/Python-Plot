@@ -40,7 +40,7 @@ for idx_tempo in range(len(li)):
 
 #Time
   for g in grib:
-   #print(g.validDate) 
+   
     time=g.validDate
 #    print(time)
 
