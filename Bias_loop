@@ -1,0 +1,183 @@
+import datetime as dt
+import wrf
+from netCDF4 import num2date, Dataset
+import numpy as np
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import pygrib
+
+import wrf as wrf
+from wrf import getvar, ALL_TIMES, latlon_coords,get_cartopy, to_np, smooth2d,cartopy_xlim, cartopy_ylim,interplevel, extract_vars
+
+#-----------Dado wrf------------------------------
+file_wrf = Dataset('wrfout_d01_2022-07-01_00:00:00')
+
+
+#Extract variables
+wrfin = extract_vars(file_wrf, ALL_TIMES,("T2", 'PSFC' ))
+
+#time
+time=getvar(file_wrf,"times",timeidx=ALL_TIMES, method='cat')
+#são 49 times a cada 1h entre os dias 01/07 00UTC a 03/07 00UTC
+#print(time)
+
+
+#Temperatura em 2m
+t2 = wrfin['T2']
+PSFC = wrfin['PSFC']
+lats,lons = latlon_coords(PSFC)
+
+#Selecionar as coordenadas de Curitiba
+#Curitiba:[-25.44,-49.23]=[269,255]
+
+lat_est = -25.44
+lon_est = -49.23
+
+#find the nearest lat lon for a point 
+abs_lat=np.abs(np.array(lats)-lat_est)
+
+abs_lon=np.abs(np.array(lons)-lon_est)
+  
+c=np.maximum(abs_lat,abs_lon)
+
+
+latlon_idx=np.argmin(c)
+
+#grid_temp=temp.flat[latlon_idx]
+x,y=np.where(c==np.min(c))
+  
+#index for the location
+grid_temp = t2[:,x[0],y[0]]
+  #x[128] e y[228] 
+  
+temp_local = grid_temp-273.15
+  
+
+#------Plot dos dados no tempo de WRF------
+
+fig = plt.figure(figsize=(10,10))
+
+
+plt.plot(time,temp_local,label='WRF',linewidth=1.5)
+
+plt.title('Temperatura a 2 metros',loc='center', fontsize=14,y=1.05)
+
+
+plt.xlabel('Time [horas]',fontsize=14)
+plt.ylabel('Temperatura [°C]',fontsize=14)
+plt.legend(loc='upper left')
+
+plt.title('WRF- Exp1', loc='left', fontsize=12) 
+#plt.title('{}'.format(str(time.values) +' UTC'), fontsize=9,loc='right')
+  
+plt.savefig("t2m_exp1.png",dpi=150)
+
+
+#--------------Dado GFS-----------
+
+path = ('../../gfs/forecasting/01/00/recorte_gfs.t00z.pgrb2.0p25.f000')
+
+
+grib= pygrib.open(path)
+
+temp = grib.select(name='2 metre temperature')[0]
+
+
+#(lon mais oeste; lat mais sul; lon mais leste e lat mais norte)
+extent = [-60,-35,-40,-18] #região do dominio simepar
+
+min_lon = extent[0];max_lon =extent[2];min_lat = extent[1];max_lat = extent[3]
+
+temp, lats_gfs, lons_gfs = temp.data(min_lat,max_lat,min_lon+360,max_lon+360)
+
+lons_gfs = lons_gfs-360
+
+#find the nearest lat lon for a point 
+
+abs_lat_gfs = np.abs(np.array(lats_gfs)-lat_est)
+
+abs_lon_gfs= np.abs(np.array(lons_gfs)-lon_est)
+
+
+c = np.maximum(abs_lat_gfs,abs_lon_gfs)
+
+
+latlon_idx = np.argmin(c)
+
+#grid_temp=temp.flat[latlon_idx]
+xg,yg = np.where(c==np.min(c))
+  
+#index for the location
+#print(lats_gfs[xg[0],yg[0]])
+#print(lons_gfs[xg[0],yg[0]])
+
+#Selecionar os arquivos do GFS conforme a data por loop:  
+time_gfs=[]
+t2_gfs=[]
+
+di=dt.datetime(2022,7,1,0)
+
+for i in range(49):
+  d=di+dt.timedelta(hours=i)
+  time_gfs.append(d)
+  path = ('../../gfs/forecasting/01/00/recorte_gfs.t00z.pgrb2.0p25.f0%02d'%i)
+  #recorte_gfs.t00z.pgrb2.0p25.f000\n",
+# Open the GRIB file\n",
+  grib = pygrib.open(path)
+  temp = grib.select(name='2 metre temperature')[0]
+  temp, lats_gfs, lons_gfs =     temp.data(min_lat,max_lat,min_lon+360,max_lon+360)
+
+#temperatura a 2m para Curitiba
+  t2_gfs.append(temp[xg[0],yg[0]])
+
+
+#convert to array
+t2_gfs = np.array(t2_gfs)-273.15
+
+
+#------Plot dos dados no tempo de WRF + GFS------
+
+fig = plt.figure(figsize=(10,10))
+
+#WRF
+plt.plot(time,temp_local,label='WRF',linewidth=1.5)
+
+#GFS
+plt.plot(time_gfs,t2_gfs,label='GFS',linewidth=1.5)
+
+plt.xlabel('Time [horas]',fontsize=14)
+plt.ylabel('Temperatura [°C]',fontsize=14)
+plt.legend(loc='upper left')
+
+plt.title('Temperatura a 2 metros WRF e GFS',loc='center', fontsize=14,y=1.05)
+
+plt.title('WRF-Exp1 e GFS', loc='left', fontsize=12)   
+plt.savefig("t2m_WRFEGFS_exp1.png",dpi=150)
+
+#-----BIAS------------- 
+
+
+fig = plt.figure(figsize=(10,10))
+
+#BIAS
+plt.plot(time,temp_local-t2_gfs,label='Bias',linewidth=1.5)
+
+#linha de 0 ° C
+plt.plot(time,np.full(len(t2_gfs),0))
+
+plt.xlabel('Time [horas]',fontsize=14)
+plt.ylabel('Temperatura [°C]',fontsize=14)
+plt.legend(loc='upper left')
+
+plt.title('BIAS de Temperatura a 2m WRF e GFS',loc='center', fontsize=14,y=1.05)
+
+plt.title('WRF-Exp1 e GFS', loc='left', fontsize=12)  
+plt.savefig("t2m_bias_exp1.png",dpi=150)
+
+
+
+
+
+
+
